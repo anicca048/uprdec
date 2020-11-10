@@ -25,8 +25,9 @@
 '''
  uprdec.py, Uplink REDSHRT decoder
 
- Python program to (de)obfuscate Uplink REDSHRT data files, does not yet support
- the decompression of REDSHRT archive files (just uses zip compression).
+ Python program to (de)obfuscate and rehash Uplink REDSHRT data files, does not
+ yet support the automatic decompression of REDSHRT archive files
+ (zip compression).
 
  File validity and program safeguards are based on how Uplink handles said
  checks, and are far from infallible. If you try to break them you will 
@@ -37,12 +38,18 @@
  
  To begin, I only bother to do this kind of thing for games that I love.
  Uplink is one of my favorite games of all time, and I knew that eventually I
- would start to peer under the hood. Plus, given the genre I think that it's
+ would start to peer under the hood. Plus, given the genre, I think that it's
  more than appropriate.
  
- This project was really fun for me, it's rare for a savefile scheme to have any
+ This project was interesting to me, it's rare for a savefile scheme to have any
  protection mechanisms that provide some challenge. The mechanisms specifically
- were simple, but well chosen, and match the spirit of the game beautifully.
+ were simple, but well chosen to delay access, and match the spirit of the game
+ beautifully.
+ 
+ I actually didn't know about the Book2 crypto puzzle until well after I
+ finished the core code, unfortunately it seems I was very late to the party.
+ Regardless, it was fun solving the REDSHRT bit without any spoilers or prebuilt
+ tools, and I'm glad to now know the purpose of world.dat.
  
  Thanks :)
 '''

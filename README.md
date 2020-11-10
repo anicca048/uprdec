@@ -1,8 +1,8 @@
 # Uprdec
 Uplink REDSHRT file decoder.
 
-Useful tool for (de)obfuscating Uplink REDSHRT files, to allow inspection and
-modification of game saves / data files.
+Useful tool for (de)obfuscating and rehashing Uplink REDSHRT files, to allow
+inspection and modification of game saves / data files.
 
 usage: uprdec.py \[-h\] \[-v\] \[-f\] mode input output
 
