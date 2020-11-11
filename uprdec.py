@@ -53,6 +53,10 @@
  
  Thanks :)
 '''
+'''
+ Finnaly: if anybody knows where I can buy an original game DVD, source DVD, and
+          or the game bible materials disc, please let me know.
+'''
 
 import os
 import sys
@@ -74,97 +78,6 @@ MAGIC_SIZE = 9
 HASH_SIZE = 20
 # Uplink uses 16kiB buffer for checksum and (de)obfuscation operations.
 BUFF_SIZE = 16384
-
-# Make sure we are dealing with a REDSHRT file.
-def check_header(input_file):
-    # Set empty header version (serves as an error code).
-    header_ver = None
-    # Original file hash before modification of data.
-    orig_hash = b'\x00' * 20
-    
-    # Read in file magic number (first 9 bytes).
-    magic = input_file.read(MAGIC_SIZE)
-    
-    if len(magic) != MAGIC_SIZE:
-        return (header_ver, orig_hash)
-    
-    # Check magic nuber against known good values.
-    if magic == MAGIC_NUMS[0]:
-        header_ver = 1
-    elif magic == MAGIC_NUMS[1]:
-        header_ver = 2
-        # Version 2 files have a modified sha1 hash.
-        orig_hash = input_file.read(HASH_SIZE)
-        
-        if len(orig_hash) != HASH_SIZE:
-            header_ver = None
-    
-    return (header_ver, orig_hash)
-
-# Generate checksum for REDSHRT data.
-def gen_hash(output_file):
-    # Create hash context object.
-    sha1_ctxt = hashlib.sha1()
-    
-    # Load first chunk from file.
-    buff = output_file.read(BUFF_SIZE)
-    
-    # Hash chunks.
-    while buff:
-        sha1_ctxt.update(buff)
-        buff = output_file.read(BUFF_SIZE)
-    
-    # Create temporary hash to hold correct value while we do reordering.
-    tmp_hash = bytearray(sha1_ctxt.digest())
-    mod_hash = bytearray(b'\x00' * 20)
-    
-    '''
-     Software implementations of SHA1 on LittleEndian systems reorder the
-     final bytes of the hash to match the BigEndian used in the SHA1 spec.
-     The Uplink devs removed the reordering loop from their implementation, I
-     assume to throw people off the trail. :P
-     To match this behavior, we run my slick version of the reordering loop,
-     reversing the algo's reordering. :)
-    '''
-    for i in range(20):
-        mod_hash[i] = tmp_hash[(((i // 4) * 4) + (3 - (i % 4)))]
-    
-    # Save modified hash value.
-    new_hash = bytes(mod_hash)
-    
-    return new_hash
-
-# (De)obfuscate REDSHRT file data.
-def encode_decode(input_file, output_file, header_ver):
-    # Write header to file.
-    if header_ver == 1:
-        output_file.write(MAGIC_NUMS[0])
-    else:
-        output_file.write(MAGIC_NUMS[1])
-    
-    # Write empty hash section for version 2 files.
-    if header_ver == 2:
-        output_file.write(b'\x00' * 20)
-    
-    # Load first data chunk.
-    buff = bytearray(input_file.read(BUFF_SIZE))
-    
-    '''
-     The main body of the REDSHRT files is obfuscated by adding 128
-     (10000000) to each byte, and deobfuscated by subtracting 128 from each
-     byte. This really just flips the 8th bit in each byte (relying on how
-     most systems handle overflow and underflow events). However, this can be
-     more simply achieved with xoring, making the operation the same for
-     obfuscation and deobfuscation.
-    '''
-    while buff:
-        for i in range(len(buff)):
-            buff[i] ^= 128
-        
-        # Write (de)obfuscated input chunk to output.
-        output_file.write(bytes(buff))
-        # Load next chunk.
-        buff = bytearray(input_file.read(BUFF_SIZE))
 
 # Entry point fuction, handles ui and file io.
 def main(operation, input_path, output_path, verbosity, safety_off):
@@ -288,6 +201,97 @@ def main(operation, input_path, output_path, verbosity, safety_off):
     # Inform user of completion.
     print("[+] done.")
 
+# Make sure we are dealing with a REDSHRT file.
+def check_header(input_file):
+    # Set empty header version (serves as an error code).
+    header_ver = None
+    # Original file hash before modification of data.
+    orig_hash = b'\x00' * 20
+    
+    # Read in file magic number (first 9 bytes).
+    magic = input_file.read(MAGIC_SIZE)
+    
+    if len(magic) != MAGIC_SIZE:
+        return (header_ver, orig_hash)
+    
+    # Check magic nuber against known good values.
+    if magic == MAGIC_NUMS[0]:
+        header_ver = 1
+    elif magic == MAGIC_NUMS[1]:
+        header_ver = 2
+        # Version 2 files have a modified sha1 hash.
+        orig_hash = input_file.read(HASH_SIZE)
+        
+        if len(orig_hash) != HASH_SIZE:
+            header_ver = None
+    
+    return (header_ver, orig_hash)
+
+# Generate checksum for REDSHRT data.
+def gen_hash(output_file):
+    # Create hash context object.
+    sha1_ctxt = hashlib.sha1()
+    
+    # Load first chunk from file.
+    buff = output_file.read(BUFF_SIZE)
+    
+    # Hash chunks.
+    while buff:
+        sha1_ctxt.update(buff)
+        buff = output_file.read(BUFF_SIZE)
+    
+    # Create temporary hash to hold correct value while we do reordering.
+    tmp_hash = bytearray(sha1_ctxt.digest())
+    mod_hash = bytearray(b'\x00' * 20)
+    
+    '''
+     Software implementations of SHA1 on LittleEndian systems reorder the
+     final bytes of the hash to match the BigEndian used in the SHA1 spec.
+     The Uplink devs removed the reordering loop from their implementation, I
+     assume to throw people off the trail. :P
+     To match this behavior, we run my slick version of the reordering loop,
+     reversing the algo's reordering. :)
+    '''
+    for i in range(20):
+        mod_hash[i] = tmp_hash[(((i // 4) * 4) + (3 - (i % 4)))]
+    
+    # Save modified hash value.
+    new_hash = bytes(mod_hash)
+    
+    return new_hash
+
+# (De)obfuscate REDSHRT file data.
+def encode_decode(input_file, output_file, header_ver):
+    # Write header to file.
+    if header_ver == 1:
+        output_file.write(MAGIC_NUMS[0])
+    else:
+        output_file.write(MAGIC_NUMS[1])
+    
+    # Write empty hash section for version 2 files.
+    if header_ver == 2:
+        output_file.write(b'\x00' * 20)
+    
+    # Load first data chunk.
+    buff = bytearray(input_file.read(BUFF_SIZE))
+    
+    '''
+     The main body of the REDSHRT files is obfuscated by adding 128
+     (10000000) to each byte, and deobfuscated by subtracting 128 from each
+     byte. This really just flips the 8th bit in each byte (relying on how
+     most systems handle overflow and underflow events). However, this can be
+     more simply achieved with xoring, making the operation the same for
+     obfuscation and deobfuscation.
+    '''
+    while buff:
+        for i in range(len(buff)):
+            buff[i] ^= 128
+        
+        # Write (de)obfuscated input chunk to output.
+        output_file.write(bytes(buff))
+        # Load next chunk.
+        buff = bytearray(input_file.read(BUFF_SIZE))
+
 # Entry point guard.
 if __name__ == "__main__":
     # Setup parser for command line arguments.
@@ -317,4 +321,3 @@ if __name__ == "__main__":
          output_path = args.output,
          verbosity = True if args.verbose else False,
          safety_off = True if args.force else False)
-
