@@ -29,9 +29,9 @@
  yet support the automatic decompression of REDSHRT archive files
  (zip compression).
 
- File validity and program safeguards are based on how Uplink handles said
- checks, and are far from infallible. If you try to break them you will 
- probably be successful, so handle with care!
+ File validity, buffer block size, and program safeguards are based on how
+ Uplink handles said mechanisms, and are far from infallible. If you try to
+ break them you will probably be successful, so handle with care!
 '''
 '''
  A note to the devs of Uplink:
@@ -43,13 +43,13 @@
  
  This project was interesting to me, it's rare for a savefile scheme to have any
  protection mechanisms that provide some challenge. The mechanisms specifically
- were simple, but well chosen to delay access, and match the spirit of the game
- beautifully.
+ were simple, but well chosen to delay access / modification, and match the
+ spirit of the game beautifully.
  
  I actually didn't know about the Book2 crypto puzzle until well after I
  finished the core code, unfortunately it seems I was very late to the party.
  Regardless, it was fun solving the REDSHRT bit without any spoilers or prebuilt
- tools, and I'm glad to now know the purpose of world.dat.
+ tools, and I'm glad to now know the purpose of the data in world.dat.
  
  Thanks :)
 '''
@@ -72,6 +72,9 @@ except AssertionError:
 
 # Two verisons of REDSHRT and v2 hash modified sha1 checksum.
 MAGIC_NUMS = [b'REDSHIRT\x00', b'REDSHRT2\x00']
+# Known inner file headers used inside REDSHRT files (zip, mp3, savefile).
+DATA_MAGIC_NUMS = [b'PK\x03\x04', b'\xFF\xFB', b'SAV']
+
 # REDSHRT file magic is 8 bytes plush null byte.
 MAGIC_SIZE = 9
 # REDSHRT file uses modified sha1 hash.
@@ -144,44 +147,63 @@ def main(operation, input_path, output_path, verbosity, safety_off):
                           file=sys.stderr)
                     exit(1)
             
-            # Reset read location for decode operation.
-            input_file.seek(MAGIC_SIZE + HASH_SIZE, 0)
-        elif operation == "encode":
-            # If hashes match assume that the file is already encoded.
+            # Ensure correct read location for decode operation.
+            input_file.seek((MAGIC_SIZE + HASH_SIZE), 0)
+        else:
+            # If hashe isn't zeroed assume that the file is already encoded.
             if orig_hash != b'\x00' * 20:
                 if safety_off:
-                    print("[#] Warning:", input_path, "has an incorrect hash!",
+                    print("[#] Warning:", input_path, "has a non empty hash!",
                           file=sys.stderr)
-                    print("[#] File may already be encoded!", file=sys.stderr)
+                    print("[#] File may not be decoded!", file=sys.stderr)
                 # Unrecoverable error otherwise.
                 else:
-                    print("[!] Error:", input_path, "has an incorrect hash!",
+                    print("[!] Error:", input_path, "has a non empty hash!",
                           file=sys.stderr)
-                    print("[!] File may already be encoded!", file=sys.stderr)
+                    print("[!] File may not be decoded!", file=sys.stderr)
                     exit(1)
+            
+            if operation == "encode":
+                # Ensure correct read location for encode operation.
+                input_file.seek((MAGIC_SIZE + HASH_SIZE), 0)
+    
+    # Check inner data for known headers and warn if it doesn't match.
+    if operation == "strip":
+        if not check_data(input_file, header_ver):
+            if safety_off:
+                print("[#] Warning:", input_path,
+                    "data does not match a known signature!", file=sys.stderr)
+                print("[#] File may not be decoded!", file=sys.stderr)
+            else:
+                print("[!] Error:", input_path,
+                    "data does not match a known signature!", file=sys.stderr)
+                print("[!] File may not be decoded!", file=sys.stderr)
+                exit(1)
     
     # Create / override output file for writing modified data.
-    output_file = open(output_path, "w+b")
+    output_file = open(output_path, "wb+")
     
     # Inform user of operation.
     if operation == "encode":
         print("[+] Writing encoded data to:", output_path)
     elif operation == "decode":
         print("[+] Writing decoded data to:", output_path)
+    else:
+        print("[+] Writing stripped data to:", output_path)
     
-    # Run obfuscate / deobfuscate function.
-    encode_decode(input_file, output_file, header_ver)
+    if operation != "strip":
+        # Run obfuscate / deobfuscate function.
+        encode_decode(input_file, output_file, header_ver)
+    else:
+        strip_header(input_file, output_file, header_ver)
     
-    # Cleanup.
+    # Don't need access to input data beyond this point.
     input_file.close()
-    output_file.close()
     
     # If an encode operation was requested, we need to rehash the file.
     if operation == "encode" and header_ver == 2:
         print("[+] Rehashing data in:", output_path)
-        # Reopen file in read-write mode for hashing.
-        output_file = open(output_path, "r+b")
-        # Seek past header to hash body.
+        # Ensure correct read location for hash operation.
         output_file.seek(MAGIC_SIZE + HASH_SIZE, 0)
         
         # Run rehash operation on obfuscated data.
@@ -190,29 +212,33 @@ def main(operation, input_path, output_path, verbosity, safety_off):
         # Write new hash to file.
         output_file.seek(MAGIC_SIZE, 0)
         output_file.write(new_hash)
-        
-        # Final Cleanup.
-        output_file.close()
 
         # Print the new hash if verbose output was requested.
         if verbosity:
             print("[#] New REDSHRT hash:", new_hash.hex())
+    
+    # Don't need access to output data beyond this point.
+    output_file.close()
     
     # Inform user of completion.
     print("[+] done.")
 
 # Make sure we are dealing with a REDSHRT file.
 def check_header(input_file):
+    # File header is at the start of the file.
+    input_file.seek(0, 0)
+    
     # Set empty header version (serves as an error code).
     header_ver = None
     # Original file hash before modification of data.
-    orig_hash = b'\x00' * 20
+    file_hash = b'\x00' * 20
     
     # Read in file magic number (first 9 bytes).
     magic = input_file.read(MAGIC_SIZE)
     
+    # Make sure file actually had MAGIC_SIZE bytes.
     if len(magic) != MAGIC_SIZE:
-        return (header_ver, orig_hash)
+        return (header_ver, file_hash)
     
     # Check magic nuber against known good values.
     if magic == MAGIC_NUMS[0]:
@@ -220,25 +246,70 @@ def check_header(input_file):
     elif magic == MAGIC_NUMS[1]:
         header_ver = 2
         # Version 2 files have a modified sha1 hash.
-        orig_hash = input_file.read(HASH_SIZE)
+        file_hash = input_file.read(HASH_SIZE)
         
-        if len(orig_hash) != HASH_SIZE:
+        if len(file_hash) != HASH_SIZE:
             header_ver = None
     
-    return (header_ver, orig_hash)
+    return (header_ver, file_hash)
 
-# Generate checksum for REDSHRT data.
-def gen_hash(output_file):
+# Check inner data in (assumed decoded) REDSHRT file for known signatures.
+def check_data(input_file, header_ver):
+    # Set seek size for use in loop.
+    if header_ver == 1:
+        seek_size = MAGIC_SIZE
+    else:
+        seek_size = (MAGIC_SIZE + HASH_SIZE)
+    
+    for magic_num in DATA_MAGIC_NUMS:
+        # Need to read data past the end of the header.
+        input_file.seek(seek_size, 0)   
+        
+        # Get data magic / header.
+        data_magic = input_file.read(len(magic_num))
+        
+        # Make sure byte count matches.
+        if len(data_magic) != len(magic_num):
+            return False
+        
+        # Check if we have a match.
+        if data_magic == magic_num:
+            return True
+    
+    # Value not in known signature list.
+    return False
+
+# Removes REDSHRT header info for use of data in files (zip, mp3).
+def strip_header(input_file, output_file, header_ver):
+    # Need to write data past the end of the header only.
+    if header_ver == 1:
+        input_file.seek(MAGIC_SIZE, 0)
+    else:
+        input_file.seek((MAGIC_SIZE + HASH_SIZE), 0)
+    
+    # Need to start writing data at the beginning of the file.
+    output_file.seek(0, 0)
+    
+    # Copy first chunk of stripped bytes from file into bufffer.
+    buff = input_file.read(BUFF_SIZE)
+    
+    # Write all stripped data from input file to output file.
+    while buff:
+        output_file.write(buff)
+        buff = input_file.read(BUFF_SIZE)
+
+# Generate checksum for REDSHRT data (assumes file position is intentional).
+def gen_hash(file):
     # Create hash context object.
     sha1_ctxt = hashlib.sha1()
     
     # Load first chunk from file.
-    buff = output_file.read(BUFF_SIZE)
+    buff = file.read(BUFF_SIZE)
     
     # Hash chunks.
     while buff:
         sha1_ctxt.update(buff)
-        buff = output_file.read(BUFF_SIZE)
+        buff = file.read(BUFF_SIZE)
     
     # Create temporary hash to hold correct value while we do reordering.
     tmp_hash = bytearray(sha1_ctxt.digest())
@@ -260,7 +331,7 @@ def gen_hash(output_file):
     
     return new_hash
 
-# (De)obfuscate REDSHRT file data.
+# (De)obfuscate REDSHRT file data (assumes file position is intentional).
 def encode_decode(input_file, output_file, header_ver):
     # Write header to file.
     if header_ver == 1:
@@ -300,7 +371,8 @@ if __name__ == "__main__":
         description="Tool to (de)obfuscate Uplink REDSHRT files.")
     
     # Add arguments to parser.
-    parser.add_argument("mode", help="mode of operation: < encode || decode >")
+    parser.add_argument("mode",
+                        help="mode of operation: < encode || decode || strip >")
     parser.add_argument("input", help="path to input file")
     parser.add_argument("output", help="path to output file")
     parser.add_argument("-v", "--verbose", action="store_true", 
@@ -312,7 +384,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     # Check for valid mode of operation.
-    if args.mode != "encode" and args.mode != "decode":
+    if not args.mode in {"encode", "decode", "strip"}:
         parser.print_help(sys.stderr)
         exit(1)
     
