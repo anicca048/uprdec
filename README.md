@@ -6,7 +6,9 @@ inspection and modification of game saves / data files.
 
 usage: uprdec.py \[-h\] \[-v\] \[-f\] mode input_file output_file
 
-mode:   decode: removes obfuscation from input_file.
+mode:
+
+        decode: removes obfuscation from input_file.
         encode: reobfuscates and rehashes data in input_file.
         strip:  removes REDSHRT header from input_file.
 
