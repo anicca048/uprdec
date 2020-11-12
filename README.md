@@ -12,7 +12,8 @@ mode:   decode: removes obfuscation from input_file.
 
 Note: input_file can not be modified in place.
 
-Examples:   ./uprdec.py -v decode data.dat data.dat.dec
+Examples:
+            ./uprdec.py -v decode data.dat data.dat.dec
             ./uprdec.py -v strip data.dat.dec data.dat.zip
             
             cp <agent_name>.usr <agent_name>.usr.bak
