@@ -372,13 +372,13 @@ if __name__ == "__main__":
     
     # Add arguments to parser.
     parser.add_argument("mode",
-                        help="mode of operation: < encode || decode || strip >")
-    parser.add_argument("input", help="path to input file")
-    parser.add_argument("output", help="path to output file")
+                        help="mode of operation: < decode || encode || strip >")
+    parser.add_argument("input_file", help="path to input file")
+    parser.add_argument("output_file", help="path to output file")
     parser.add_argument("-v", "--verbose", action="store_true", 
                         help="use verbose output")
     parser.add_argument("-f", "--force", action="store_true",
-                        help="ignore checksum when checking for file validity")
+                        help="ignore most file validity checking mechanisms")
     
     # Fetch arguments from sys.argv[].
     args = parser.parse_args()
@@ -389,7 +389,7 @@ if __name__ == "__main__":
         exit(1)
     
     # Start program with user arguments.
-    main(operation = args.mode, input_path = args.input,
-         output_path = args.output,
+    main(operation = args.mode, input_path = args.input_file,
+         output_path = args.output_file,
          verbosity = True if args.verbose else False,
          safety_off = True if args.force else False)
