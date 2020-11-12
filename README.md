@@ -15,9 +15,9 @@ Note: input_file can not be modified in place.
 Examples:   ./uprdec.py -v decode data.dat data.dat.dec
             ./uprdec.py -v strip data.dat.dec data.dat.zip
             
-            cp \<agent_name\>.usr \<agent_name\>.usr.bak
-            ./uprdec.py -v decode \<agent_name\>.usr \<agent_name\>.usr.dec
-            \<hex_editor\> \<agent_name\>.usr.dec
-            ./uprdec.py -v encode \<agent_name\>.usr.dec \<agent_name\>.usr
+            cp <agent_name>.usr <agent_name>.usr.bak
+            ./uprdec.py -v decode <agent_name>.usr <agent_name>.usr.dec
+            <hex_editor> <agent_name>.usr.dec
+            ./uprdec.py -v encode <agent_name>.usr.dec <agent_name>.usr
 
 **This project is licensed under the terms of the MIT open source license.**
